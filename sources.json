@@ -61,5 +61,17 @@
   "PYTHON64": {
     "url": "https://www.python.org/ftp/python/2.7.10/python-2.7.10.amd64.msi",
     "ver": "2.7.10"
+  },
+  "ZADIG": {
+    "url": "http://zadig.akeo.ie/downloads/zadig_2.1.2.exe",
+    "ver": "2.1.2"
+  },
+  "PART_DRIVE": {
+    "url": "https://s3.amazonaws.com/spark-website/Spark.zip",
+    "ver": "1.0"
+  },
+  "VS_EXPRESS": {
+    "url": "https://go.microsoft.com/fwlink/?LinkId=615464&clcid=0x409",
+    "ver": "1.0"
   }
 }
