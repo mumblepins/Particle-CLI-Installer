@@ -8,17 +8,17 @@
     "ver": "4.3.1"
   },
   "VISUAL_STUDIO": {
-     "url": "https://go.microsoft.com/fwlink/?LinkId=691978&clcid=0x409",
-     "ver": "2015"
-   },
- "PYTHON": {
-   "url": "https://www.python.org/ftp/python/2.7.10/python-2.7.10.msi",
-   "ver": "2.7.10"
- },
- "PYTHON64": {
-   "url": "https://www.python.org/ftp/python/2.7.10/python-2.7.10.amd64.msi",
-   "ver": "2.7.10"
- },
+    "url": "https://go.microsoft.com/fwlink/?LinkId=691978&clcid=0x409",
+    "ver": "2015"
+  },
+  "PYTHON": {
+    "url": "https://www.python.org/ftp/python/2.7.10/python-2.7.10.msi",
+    "ver": "2.7.10"
+  },
+  "PYTHON64": {
+    "url": "https://www.python.org/ftp/python/2.7.10/python-2.7.10.amd64.msi",
+    "ver": "2.7.10"
+  },
   "ZADIG": {
     "url": "http://zadig.akeo.ie/downloads/zadig_2.2.exe",
     "ver": "2.2"
