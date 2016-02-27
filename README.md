@@ -1,7 +1,7 @@
 # Particle CLI Installer
 [Download the most recent release.](https://github.com/mumblepins/Particle-CLI-Installer/releases/latest)
 
-An installer to make the setup of the [Particle CLI](https://github.com/spark/particle-cli) easier.  Uses the NSIS installer to download and install the components for Windows.  Checks against `sources.json` for latest version.  
+An installer to make the setup of the [Particle CLI](https://github.com/spark/particle-cli) easier.  Uses the NSIS installer to download and install the components for Windows.  Checks against [`sources.json`](https://github.com/mumblepins/Particle-CLI-Installer/blob/master/sources.json) for latest version.  
 
 ###Components
 * Installs the [Particle CLI](https://github.com/spark/particle-cli) and all prerequisites necessary
