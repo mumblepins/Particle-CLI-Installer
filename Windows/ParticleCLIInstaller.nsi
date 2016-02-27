@@ -1,8 +1,8 @@
 !include MUI2.nsh
 SetCompressor /solid lzma
 
-!define PRODUCT_NAME "Particle CLI"
-!define SHORT_NAME "ParticleCLI"
+!define PRODUCT_NAME "Particle CLI Installer"
+!define SHORT_NAME "ParticleCLIInstaller"
 
 ; The name of the installer
 Name "${PRODUCT_NAME}"
