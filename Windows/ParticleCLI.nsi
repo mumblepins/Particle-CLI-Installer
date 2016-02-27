@@ -1,27 +1,19 @@
-; example2.nsi
-;
-; This script is based on example1.nsi, but it remember the directory,
-; has uninstall support and (optionally) installs start menu shortcuts.
-;
-; It will install example2.nsi into a directory that the user selects,
-
-;--------------------------------
-
-
 
 SetCompressor /solid lzma
 
+!define PRODUCT_NAME "Particle CLI"
+!define SHORT_NAME "ParticleCLI"
+
 ; The name of the installer
-Name "Particle Toolchain"
+Name "${PRODUCT_NAME}"
 !include 'LogicLib.nsh'
 !include 'Sections.nsh'
 !include 'TextFunc.nsh'
 !include "DotNetChecker.nsh"
-!define PRODUCT_NAME "Particle Toolchain"
 !include 'x64.nsh'
 !insertmacro VersionCompare
 !insertmacro ConfigWrite
-!define REG_PATH "Software\ParticleToolchain"
+!define REG_PATH "Software\${SHORT_NAME}"
 
 ;FileExists is already part of LogicLib, but returns true for directories as well as files
 !macro _FileExists2 _a _b _t _f
@@ -84,12 +76,13 @@ Name "Particle Toolchain"
  
 !define StrReplace '!insertmacro "_StrReplaceConstructor"'
 
-
-!define JSON_ADDRESS "https://raw.githubusercontent.com/mumblepins/ParticleToolchainInstaller/master/sources.json"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+!define JSON_ADDRESS "https://raw.githubusercontent.com/mumblepins/Particle-CLI-Installer/master/sources.json"
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ShowInstDetails show
 
 ; The file to write
-OutFile "ParticleToolchain.exe"
+OutFile "${SHORT_NAME}.exe"
 
 XPStyle on
 InstallColors /windows
@@ -117,6 +110,8 @@ Function .onInit
     Var /GLOBAL PYTHON_ADDR
     Var /GLOBAL PYTHON64_ADDR
     Var /GLOBAL MSBUILD_ADDR
+    Var /GLOBAL VSEXP_ADDR
+    
     
     Var /GLOBAL GCC_ARM_VER
     Var /GLOBAL MAKE_BINARY_VER
@@ -133,6 +128,7 @@ Function .onInit
     Var /GLOBAL PYTHON_VER
     Var /GLOBAL PYTHON64_VER
     Var /GLOBAL MSBUILD_VER
+	Var /GLOBAL VSEXP_VER
     
     StrCpy "$TempFile" "$TEMP\release_info.json"
     inetc::get /QUESTION "" /BANNER "Downloading Installation Info"  /CAPTION "Downloading..." /RESUME "" "${JSON_ADDRESS}" "$TempFile" /END
@@ -240,6 +236,13 @@ Function .onInit
     ${IfNot} ${Errors}
         Pop $R0
         StrCpy "$MSBUILD_ADDR" "$R0"
+    ${EndIf}
+    
+    ClearErrors
+    nsJSON::Get /noexpand `VS_EXPRESS` `url` /end
+    ${IfNot} ${Errors}
+        Pop $R0
+        StrCpy "$VSEXP_ADDR" "$R0"
     ${EndIf}
     
     
@@ -350,7 +353,12 @@ Function .onInit
         StrCpy "$MSBUILD_VER" "$R0"
     ${EndIf}
     
-    
+    ClearErrors
+    nsJSON::Get /noexpand `VS_EXPRESS` `ver` /end
+    ${IfNot} ${Errors}
+        Pop $R0
+        StrCpy "$VSEXP_VER" "$R0"
+    ${EndIf}
 FunctionEnd
 
 
@@ -374,9 +382,6 @@ UninstPage uninstConfirm
 UninstPage instfiles
 
 InstType "Full"
-InstType "Toolchain Only"
-InstType "CLI Only"
-
 
 
 ;--------------------------------
@@ -384,130 +389,9 @@ InstType "CLI Only"
 ; The stuff to install
 
 
-SectionGroup "Toolchain"
-    Section "Make"
-        SectionIn 1 2
-        AddSize 2263
-        DetailPrint "Installing Make"
-
-        Call InstallMake
-
-        DetailPrint "Adding Path"
-        Push "$INSTDIR\Toolchain\Make\bin"
-        Call AddToPath
-              
-    SectionEnd
-    
-    Section "MinGW"
-        SectionIn 1 2
-        AddSize 441344
-        DetailPrint "Installing MinGW"
-
-        ; Set output path to the installation directory.
-        SetOutPath $INSTDIR
-
-        Call InstallMinGW
-
-        DetailPrint "Adding Path"
-        Push "$INSTDIR\Toolchain\MinGW"
-        Call AddToPath
-        Push "$INSTDIR\Toolchain\MinGW\msys\1.0\bin"
-        Call AddToPath  
-       
-        
-        
-    SectionEnd
-    
-    Section "GCC ARM"
-        SectionIn 1 2
-        AddSize 314368
-        DetailPrint "Installing GCC ARM"
-
-        ; Set output path to the installation directory.
-        SetOutPath $INSTDIR
-
-        Call InstallGccArm
-
-        DetailPrint "Adding Path"
-        Push "$INSTDIR\Toolchain\GCC-ARM\bin"
-        Call AddToPath  
-         
-    SectionEnd
-SectionGroupEnd
-
-Section Git
-    SectionIn 1
-    AddSize 270336
-    DetailPrint "Installing Git"
-    Call InstallGit
-    ReadEnvStr $R0 "PATH"
-	StrCpy $R0 "$R0;$INSTDIR\Tools\Git\cmd"
-    System::Call 'Kernel32::SetEnvironmentVariable(t, t) i("PATH", R0).r0'
-    ReadEnvStr $R0 "PATH"
-    DetailPrint $R0
-    
-            
-SectionEnd
-
-SectionGroup "Netbeans (Install JDK if not installed)" SEC_GRP
-    Section "Netbeans" SEC_REQ
-		AddSize 248832
-        SectionIn 1 RO
-        DetailPrint "Installing Netbeans"
-        Call InstallNetbeans
-        
-    SectionEnd
-    
-    Section "Config" SEC_OPT
-        SectionIn 1
-        DetailPrint "Writing Netbeans Config"
-        Call WriteToolchainProperties
-    SectionEnd
-    
-    Section "" PRIVSEC_TOGGLESTATE ;hidden section to keep track of state
-    SectionEnd
-SectionGroupEnd
-
-Section "Cygwin (needed for automatic build in Netbeans)"
-    SectionIn 1
-    AddSize 144384
-    DetailPrint "Installing Cygwin"
-    Call InstallCygwin
-SectionEnd
-
-SectionGroup "Particle Firmware" SEC_GRP1
-    Section "Firmware" SEC_REQ1
-		AddSize 117720
-        SectionIn 1 RO
-        SetOutPath "$INSTDIR"
-        DetailPrint "Git Clone Firmware"
-        nsExec::ExecToLog "git clone https://github.com/spark/firmware"
-        SetOutPath "$INSTDIR\firmware"
-        nsExec::ExecToLog "git checkout latest"
-    SectionEnd
-        
-    Section "Netbeans Project" SEC_OPT1
-		AddSize 200
-        SectionIn 1
-        SetOverwrite off
-        SetOutPath "$INSTDIR\NBProjects\ParticleFirmware\nbproject"
-        File configurations.xml
-        File project.xml
-        SetOutPath "$INSTDIR\NBProjects\ParticleFirmware\nbproject\private"
-        File CodeAssistancePathMapper.properties
-        File /oname=configurations.xml private_configurations.xml
-        File private.xml
-        File Core.properties
-        File Launcher.properties
-        SetOverwrite on
-    SectionEnd
-    
-    Section "" PRIVSEC_TOGGLESTATE1 ;hidden section to keep track of state
-    SectionEnd
-SectionGroupEnd
 
 Section "Particle CLI"
-	SectionIn 1 3
+	SectionIn 1 RO
 	AddSize 123801
 	Call InstallParticleCLI
 SectionEnd
@@ -525,13 +409,13 @@ SectionEnd
 
 Section
     ; Write the installation path into the registry
-    WriteRegStr HKLM SOFTWARE\ParticleToolchain "Install_Dir" "$INSTDIR"
+    WriteRegStr HKLM ${REG_PATH} "Install_Dir" "$INSTDIR"
 
     ; Write the uninstall keys for Windows
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ParticleToolchain" "DisplayName" "Particle Toolchain"
-    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ParticleToolchain" "UninstallString" '"$INSTDIR\uninstall.exe"'
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ParticleToolchain" "NoModify" 1
-    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ParticleToolchain" "NoRepair" 1
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORT_NAME}" "DisplayName" "${PRODUCT_NAME}"
+    WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORT_NAME}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORT_NAME}" "NoModify" 1
+    WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORT_NAME}" "NoRepair" 1
     WriteUninstaller "uninstall.exe"
 SectionEnd
 
@@ -542,383 +426,101 @@ SectionEnd
 
 Section "Uninstall"
 
-	; Uninstall NodeJS
-	;nsExec::ExecToLog "msiexec /x{B716A4B0-5096-4132-A741-2D99CFF53207} /passive"
-	; Uninstall Python
-	;nsExec::ExecToLog "MsiExec.exe /x{E2B51919-207A-43EB-AE78-733F9C6797C2} /passive"
-    ; Remove registry keys
-    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\ParticleToolchain"
-    DeleteRegKey HKLM SOFTWARE\ParticleToolchain
-    
-    RMDir /r /REBOOTOK "$INSTDir\Toolchain"
-
-	
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SHORT_NAME}"
+    DeleteRegKey HKLM ${REG_PATH} 
 
 	RMDir /r /REBOOTOK "$INSTDir\Tools\DFU-util"
-    ; Remove files and uninstaller
-    ;  Delete $INSTDIR\ParticleToolchain.nsi
+	
     Delete $INSTDIR\uninstall.exe
 
    
     RMDir "$INSTDIR"
-    Push "$INSTDIR\Toolchain\Make\bin"
-    Call un.RemoveFromPath
-    Push "$INSTDIR\Toolchain\GCC-ARM\bin"
-    Call un.RemoveFromPath
-    Push "$INSTDIR\Toolchain\MinGW"
-    Call un.RemoveFromPath
-    Push "$INSTDIR\Toolchain\MinGW\msys\1.0\bin"
-    Call un.RemoveFromPath
     Push "$INSTDIR\Tools\DFU-util"
 	Call un.RemoveFromPath
      
 SectionEnd
 
 
-Function .onSelChange
-    !define /math SECFLAGS_SELRO ${SF_SELECTED} | ${SF_RO}
-    ${IfNot} ${SectionIsSelected} ${PRIVSEC_TOGGLESTATE}
-    ${AndIf} ${SectionIsReadOnly} ${SEC_REQ}
-        !insertmacro ClearSectionFlag ${SEC_REQ} ${SECFLAGS_SELRO}
-    ${EndIf}
-    ${If} ${SectionIsSelected} ${SEC_OPT}
-        !insertmacro SetSectionFlag ${SEC_REQ} ${SECFLAGS_SELRO} 
-    ${Else}
-        !insertmacro ClearSectionFlag ${SEC_REQ} ${SF_RO}
-    ${EndIf}
-    ${If} ${SectionIsSelected} ${SEC_REQ}
-        !insertmacro SelectSection ${PRIVSEC_TOGGLESTATE}
-    ${Else}
-        !insertmacro UnselectSection ${PRIVSEC_TOGGLESTATE}
-    ${EndIf}
-    
-    ${IfNot} ${SectionIsSelected} ${PRIVSEC_TOGGLESTATE1}
-    ${AndIf} ${SectionIsReadOnly} ${SEC_REQ1}
-        !insertmacro ClearSectionFlag ${SEC_REQ1} ${SECFLAGS_SELRO}
-    ${EndIf}
-    ${If} ${SectionIsSelected} ${SEC_OPT1}
-        !insertmacro SetSectionFlag ${SEC_REQ1} ${SECFLAGS_SELRO} 
-    ${Else}
-        !insertmacro ClearSectionFlag ${SEC_REQ1} ${SF_RO}
-    ${EndIf}
-    ${If} ${SectionIsSelected} ${SEC_REQ1}
-        !insertmacro SelectSection ${PRIVSEC_TOGGLESTATE1}
-    ${Else}
-        !insertmacro UnselectSection ${PRIVSEC_TOGGLESTATE1}
-    ${EndIf}
-    !undef SECFLAGS_SELRO
-    
-    
-FunctionEnd
 
-Function InstallGccArm
-	DetailPrint "Checking GCC Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "GCC_ARM_Version"
-	IfErrors 0 CheckGCC_Ver
-	goto  InstallGCCArmNow
-	CheckGCC_Ver:
-	${VersionCompare} $0 "$GCC_ARM_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update GCC ARM"
-        goto InstallGCCArmNow
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstallGCCArmNow:
-    StrCpy "$TempFile" "$TEMP\gcc-arm.zip"
-    Download:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$GCC_ARM_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    CreateDirectory "$INSTDIR\Toolchain\GCC-ARM"
-    nsisunz::UnzipToLog "$TempFile" "$INSTDIR\Toolchain\GCC-ARM\"
-    Delete "$TempFile"
-     WriteRegStr HKLM "${REG_PATH}" "GCC_ARM_Version" "$GCC_ARM_VER"
-	
-    EndFunc:
 
-FunctionEnd
-
-Function InstallMake
-    DetailPrint "Checking Make Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "Make_Version"
-	IfErrors 0 CheckMakeVer
-	goto  InstallMakeNow
-	CheckMakeVer:
-	${VersionCompare} $0 "$MAKE_BINARY_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update Make"
-        goto InstallMakeNow
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstallMakeNow:
-    StrCpy "$TempFile" "$TEMP\make_bin.zip"
-    Download:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$MAKE_BINARY_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    CreateDirectory "$INSTDIR\Toolchain\Make"
-    nsisunz::UnzipToLog "$TempFile" "$INSTDIR\Toolchain\Make\"
-    Delete "$TempFile"
-
-    StrCpy "$TempFile" "$TEMP\make_libs.zip"
-    Download2:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$MAKE_DEPEND_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok2
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download2
-    Abort
-
-    dlok2:
-    nsisunz::UnzipToLog "$TempFile" "$INSTDIR\Toolchain\Make\"
-    Delete "$TempFile"
-    WriteRegStr HKLM "${REG_PATH}" "Make_Version" "$MAKE_BINARY_VER"
-	
-    EndFunc:
-FunctionEnd
-
-Function InstallMinGW
-	DetailPrint "Checking MinGw Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "MinGW_Version"
-	IfErrors 0 CheckminGW_Ver
-	goto  InstallMinGWNow
-	CheckminGW_Ver:
-	${VersionCompare} $0 "$MINGW_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update MinGW"
-        goto InstallMinGWNow
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstallMinGWNow:
-    StrCpy "$TempFile" "$TEMP\mingw.zip"
-    Download:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$MINGW_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    CreateDirectory "$INSTDIR\Toolchain\MinGW"
-    nsisunz::UnzipToLog "$TempFile" "$INSTDIR\Toolchain\MinGW\"
-
-    Delete "$TempFile"
-
-    DetailPrint "Downloading and Installing MinGW Packages"
-    nsExec::ExecToLog '"$INSTDIR\Toolchain\MinGW\bin\mingw-get.exe" install mingw32-base mingw32-gcc-g++ msys-make mingw-developer-toolkit'
-    WriteRegStr HKLM "${REG_PATH}" "MinGW_Version" "$MINGW_VER"
-	
-    EndFunc:
-FunctionEnd
-
-Function InstallGit
-	DetailPrint "Checking Git Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "Git_Version"
-	IfErrors 0 CheckGit_Ver
-	goto  InstallGitNow
-	CheckGit_Ver:
-	${VersionCompare} $0 "$GIT_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update Git"
-        goto InstallGitNow
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstallGitNow:
-	DetailPrint "Downloading Git"
-
-    StrCpy "$TempFile" "$TEMP\git.exe"
-    Download:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$GIT_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    CreateDirectory "$INSTDIR\Tools\Git"
-    SetOutPath $TEMP
-    File "git_setup.inf"
-    ExecWait '"$TempFile" /SILENT /SP- /DIR=$INSTDIR\Tools\Git /LOADINF="$TEMP\git_setup.inf"'
-    Delete "$TEMP\git_setup.inf"
-    Delete "$TempFile"
-	WriteRegStr HKLM "${REG_PATH}" "Git_Version" "$GIT_VER"
-	
-    EndFunc:
-FunctionEnd
-
-Function InstallNetbeans
-
-    ClearErrors
-    ReadRegStr $1 HKLM "SOFTWARE\JavaSoft\Java Development Kit" "CurrentVersion"
-    ReadRegStr $2 HKLM "SOFTWARE\JavaSoft\Java Development Kit\$1" "JavaHome"
-    
-    IfErrors 0 JavaInstalled
-        Call InstallJDK
-        Goto JavaInstalledAndUpdated
-    JavaInstalled:
-    ${VersionCompare} $1 "1.7" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update JDK"
-        Call InstallJDK
-    ${EndIf}
-    JavaInstalledAndUpdated:
-    
-    DetailPrint "Checking Netbeans Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "Netbeans_Version"
-	IfErrors 0 CheckNetbeans_Ver
-	goto  InstNetbeans
-	CheckNetbeans_Ver:
-	${VersionCompare} $0 "$NETBEANS_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update Netbeans"
-        goto InstNetbeans
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstNetbeans:
-    DetailPrint "Installing Netbeans"
-    StrCpy "$TempFile" "$TEMP\netbeans.exe"
-    Download:
-    
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$NETBEANS_ADDRESS" "$TempFile" /END
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    CreateDirectory "$INSTDIR\Tools\Netbeans"
-    ExecWait '"$TempFile" --silent "-J-Dnb-base.installation.location=$INSTDIR\Tools\Netbeans"'
-    Delete "$TempFile"
-     WriteRegStr HKLM "${REG_PATH}" "Netbeans_Version" "$NETBEANS_VER"
-	
-    EndFunc:
-    
-FunctionEnd
-
-Function InstallJDK
-    DetailPrint "Installing JDK"
-    StrCpy "$TempFile" "$TEMP\JDK_installer.exe"
-    
-    Download:
-    ${If} ${RunningX64}
-        ; 64 bit code
-        inetc::get /QUESTION "" /RESUME ""\
-            /USERAGENT "Wget/1.9.1" /NOCOOKIES /HEADER "Cookie: oraclelicense=accept-securebackup-cookie" "$JDK64_ADDRESS" "$TempFile" /END
-        ;ExecWait "$INSTDIR\Ninite JDK x64 8 Installer.exe"
-        ;Delete "$INSTDIR\Ninite JDK x64 8 Installer.exe"
-        
-    ${Else}
-        ; 32 bit code
-        inetc::get /QUESTION "" /RESUME ""\
-            /USERAGENT "Wget/1.9.1" /NOCOOKIES /HEADER "Cookie: oraclelicense=accept-securebackup-cookie" "$JDK_ADDRESS" "$TempFile" /END
-        ;ExecWait "$INSTDIR\Ninite JDK 8 Installer.exe"
-        ;Delete "$INSTDIR\Ninite JDK 8 Installer.exe"
-    ${EndIf}
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    
-    ExecWait "$TempFile /s"
-    Delete "$TempFile"
-FunctionEnd
-
-Function InstallCygwin
-	DetailPrint "Checking Cygwin Version Installed"
-	ClearErrors
-	ReadRegStr $0 HKLM "${REG_PATH}" "Cygwin_Version"
-	IfErrors 0 CheckCygwin_Ver
-	goto  InstallCygwin
-	CheckCygwin_Ver:
-	${VersionCompare} $0 "$CYGWIN_VER" $R0
-    ${If} $R0 == 2
-        DetailPrint "Need to update Cygwin"
-        goto InstallCygwin
-	${Else}
-		goto EndFunc
-    ${EndIf}
-	
-	InstallCygwin:
-    DetailPrint "Installing Cygwin"
-    CreateDirectory "$INSTDIR\Tools\Cygwin"
-    StrCpy "$TempFile" "$INSTDIR\Tools\Cygwin\Cygwin_setup.exe"
-    
-    Download:
-    ;${If} ${RunningX64}
-        ;; 64 bit code
-        ;inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$CYGWIN64_ADDR" "$TempFile" /END
-    ;${Else}
-        ; 32 bit code
-        inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$CYGWIN_ADDR" "$TempFile" /END
-    ;${EndIf}
-    Pop $0
-    StrCmp $0 "OK" dlok
-    SetDetailsView show
-    DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
-    Abort
-    dlok:
-    ExecWait '"$TempFile" -q -R "$INSTDIR\Tools\Cygwin" -l "$INSTDIR\Tools\Cygwin\Packages" -s "http://cygwin.mirror.constant.com"'
-     WriteRegStr HKLM "${REG_PATH}" "Cygwin_Version" "$CYGWIN_VER"
-	
-    EndFunc:
-FunctionEnd
 
 Function InstallParticleCLI
+
 
 	;; Install NodeJS
 	DetailPrint "Checking NodeJs Version Installed"
 	ClearErrors
 	ReadRegStr $0 HKLM "${REG_PATH}" "NodeJs_Version"
 	IfErrors 0 CheckNodeJS_Ver
-	goto  InstallNodeJS
+	call  InstallNodeJS
 	CheckNodeJS_Ver:
 	${VersionCompare} $0 "$NODE_VER" $R0
-    ${If} $R0 == 2
+    ${If} $R0 = 2
         DetailPrint "Need to update NodeJS"
-        goto InstallNodeJS
+        call InstallNodeJS
 	${Else}
-		goto CheckDotNet
+		goto CheckCLI
     ${EndIf}
 	
-	InstallNodeJS:
+	
+	CheckCLI:
+	  ;; set path
+    ReadEnvStr $R0 "PATH"
+	StrCpy $R0 "$R0;$INSTDIR\Tools\NodeJS;$APPDATA\npm"
+    System::Call 'Kernel32::SetEnvironmentVariable(t, t) i("PATH", R0).r0'
+    ReadEnvStr $R0 "PATH"
+    DetailPrint $R0
+     
+    ;; check if particle-cli installed
+    SetOutPath "$APPDATA\npm"
+    nsExec::ExecToLog "$INSTDIR\Tools\NodeJS\npm.cmd ls particle-cli --parseable true"
+    Pop $0
+    DetailPrint $0
+    ${If} $0 = 0 ; particle-cli seems to be installed, let's just run an update
+		DetailPrint "Updating Particle CLI"
+		SetOutPath "$INSTDIR\TOOLS\NodeJS"
+		nsExec::ExecToLog 'npm update particle-cli'
+	${else}
+		; let's try this 
+		DetailPrint "Installing Particle CLI"
+		SetOutPath "$INSTDIR\TOOLS\NodeJS"
+		;File install-particle-cli.bat
+	   ; nsExec::ExecToLog 'install-particle-cli.bat'
+		nsExec::ExecToLog "$INSTDIR\Tools\NodeJS\npm.cmd install -g particle-cli"
+		Pop $0
+		DetailPrint $0
+		${If} $0 = 0
+			; sucecess!! Let's just go to the end of the function
+			goto EndFunc
+		${Else}
+			;; didn't install.  Let's install prerequisities and try again
+			;call InstallDotNet
+			;call InstallMSBuildTools
+			MessageBox MB_YESNO|MB_ICONEXCLAMATION "Particle CLI didn't install properly. Shall we try installing Python and Visual Studio Express 2015 (recommended)? This should fix the issue." /SD IDYES IDNO EndFunc
+			call InstallVSExpress
+			call InstallPython
+			SetOutPath "$TEMP"
+			File ParticleInstall.bat
+			nsExec::ExecToLog "ParticleInstall.bat"
+			Pop $0
+			Delete ParticleInstall.bat
+			DetailPrint $0
+			${If} $0 = 0
+				;; this time we had success
+				goto EndFunc
+			${Else}
+				;; still no success, throw a message at the user
+				MessageBox MB_OK|MB_ICONEXCLAMATION 'particle-cli failed to install. Once the installer exits, try opening a command window and running "npm install -g particle-cli"' /SD IDOK
+				goto EndFunc
+			${EndIf}
+		${EndIf}
+		;Delete install-particle-cli.bat
+    ${endif}
+	
+	EndFunc:
+FunctionEnd
+
+Function InstallNodeJS
     SetOutPath "$InstDir"
 	DetailPrint "Downloading NodeJS"
     StrCpy "$TempFile" "$TEMP\node_setup.msi"
@@ -943,61 +545,47 @@ Function InstallParticleCLI
     SetDetailsPrint both
     Delete "$TempFile"
     WriteRegStr HKLM "${REG_PATH}" "NodeJs_Version" "$NODE_VER"
-	
-	CheckDotNet:
-    ;; Check .Net framework
-    !insertmacro CheckNetFramework 451
-    
-    ;; MS Build Tools
-    ClearErrors
-    EnumRegKey $0 HKLM "Software\Microsoft\MSBuild\ToolsVersions\12.0" 0
-    IfErrors 0 MSBuildInstalled
-    ; Need to install ms build tools   
-    DetailPrint "MS BuildTools not found. Installing."
-    DetailPrint "Downloading MS Build Tools"
-    SetOutPath "$InstDir"
-    StrCpy "$TempFile" "$TEMP\buildtools.exe"
-    Download1:
-    inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$MSBUILD_ADDR" "$TempFile" /END
+FunctionEnd
+
+
+Function InstallVSExpress
+	DetailPrint "Downloading VS Express"
+    StrCpy "$TempFile" "$TEMP\vsexpress_setup.exe"
+    Download:
+	inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$VSEXP_ADDR" "$TempFile" /END
+  
     Pop $0
-    StrCmp $0 "OK" dlok1
+    StrCmp $0 "OK" dlok2
     SetDetailsView show
     DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download1
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
     Abort
-    dlok1:
-    DetailPrint "Installing MS Build Tools"
-   ; SetDetailsPrint none
-    ExecWait '"$TempFile" /Passive'
-    SetDetailsPrint both
+    dlok2:
+    DetailPrint "Installing Visual Studio Express"
+    ExecWait '$TempFile /Passive /NoRestart'
     Delete "$TempFile"
-    Goto CheckPython
-    
-    
-    MSBuildInstalled:
-    DetailPrint "MS BuildTools Already Installed"
-    
-    
-    CheckPython:
-    ;; Install Python
+FunctionEnd
+
+Function InstallPython
+	;; Install Python
     DetailPrint "Checking Python Version Installed"
 	ClearErrors
 	ReadRegStr $0 HKLM "${REG_PATH}" "Python_Version"
 	IfErrors 0 CheckPython_Ver
-	goto  InstallPython
+	goto  InstallPy
 	CheckPython_Ver:
 	${VersionCompare} $0 "$PYTHON_VER" $R0
     ${If} $R0 == 2
         DetailPrint "Need to update Python"
-        goto InstallPython
+        goto InstallPy
 	${Else}
-		goto InstallCli
+		goto PythonInstalled
     ${EndIf}
 	
-	InstallPython:
+	InstallPy:
 	DetailPrint "Downloading Python"
     StrCpy "$TempFile" "$TEMP\python_setup.msi"
-    Download2:
+    Download:
     ${If} ${RunningX64}
         ; 64 bit code
         inetc::get /QUESTION "" /RESUME "" /USERAGENT "Wget/1.9.1" "$PYTHON64_ADDR" "$TempFile" /END
@@ -1009,42 +597,21 @@ Function InstallParticleCLI
     StrCmp $0 "OK" dlok2
     SetDetailsView show
     DetailPrint "Error: $0"
-    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download2
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Download error, Retry?" /SD IDCANCEL IDRETRY Download
     Abort
     dlok2:
     DetailPrint "Installing Python"
-    ;SetDetailsPrint none
-    ExecWait 'msiexec /i "$TempFile" TARGETDIR="$INSTDIR\Tools\Python27" ALLUSERS=1 /passive'
-    SetDetailsPrint both
+    ExecWait 'msiexec /i "$TempFile" ALLUSERS=1 TARGETDIR="$INSTDIR\Tools\Python27" /passive ADDLOCAL=ALL'
     Delete "$TempFile"
-    
+    ;Push "$INSTDIR\Tools\Python27"
+    ;Call AddToPath
     WriteRegStr HKLM "${REG_PATH}" "Python_Version" "$PYTHON_VER"
+    goto EndFunc
     
-    InstallCli:
+    PythonInstalled:
+    DetailPrint "Python Already Installed"
     
-    ;; set path
-    ReadEnvStr $R0 "PATH"
-	StrCpy $R0 "$R0;$INSTDIR\Tools\NodeJS;$APPDATA\npm"
-    System::Call 'Kernel32::SetEnvironmentVariable(t, t) i("PATH", R0).r0'
-    ReadEnvStr $R0 "PATH"
-    DetailPrint $R0
-    
-    ;; check if particle-cli installed
-    SetOutPath "$APPDATA\npm"
-    nsExec::ExecToLog "$INSTDIR\Tools\NodeJS\npm.cmd ls particle-cli --parseable true"
-    Pop $0
-    ${If} $0 = 0 ; particle-cli seems to be installed, let's just run an update
-    DetailPrint "Updating Particle CLI"
-	SetOutPath "$INSTDIR\TOOLS\NodeJS"
-	nsExec::ExecToLog 'npm update particle-cli'
-	${else}
-    DetailPrint "Installing Particle CLI"
-   ; SetDetailsPrint none
-	SetOutPath "$INSTDIR\TOOLS\NodeJS"
-	File install-particle-cli.bat
-    nsExec::ExecToLog 'install-particle-cli.bat'
-    Delete install-particle-cli.bat
-    ${endif}
+    EndFunc:
 FunctionEnd
 ;--------------------------------------------------------------------
 ; Path functions
