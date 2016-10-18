@@ -1,3 +1,13 @@
+---------------
+
+# Deprecated !! 
+
+**Use https://github.com/spark/particle-cli-wrapper instead**
+
+---------------
+
+<br><br><br><br><br><br>
+
 # Particle CLI Installer
 [Download the most recent release.](https://github.com/mumblepins/Particle-CLI-Installer/releases/latest)
 
